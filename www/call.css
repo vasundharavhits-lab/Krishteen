@@ -1,0 +1,276 @@
+:root {
+  --bg-deep: #14121f;
+  --bg-panel: #1c1830;
+  --bg-panel-2: #221d3a;
+  --accent-coral: #ff8a5c;
+  --accent-coral-dim: #ff8a5c33;
+  --accent-blue: #7c9eff;
+  --accent-blue-dim: #7c9eff33;
+  --text-primary: #f5f1ff;
+  --text-muted: #9089ad;
+  --danger: #ff5c72;
+
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-body: 'IBM Plex Sans', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: radial-gradient(circle at 50% -10%, #2a2246 0%, var(--bg-deep) 60%);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  overflow: hidden;
+}
+
+.call-screen {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- Header ---------- */
+.call-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  flex-shrink: 0;
+}
+
+.back-link {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-family: var(--font-body);
+  font-size: 14px;
+  transition: color 0.2s ease;
+}
+.back-link:hover { color: var(--text-primary); }
+
+.call-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.call-timer {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  color: var(--text-muted);
+  min-width: 48px;
+  text-align: right;
+}
+
+/* ---------- Orb stage (signature element) ---------- */
+.orb-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  gap: 28px;
+}
+
+.orb-rings {
+  position: absolute;
+  width: 260px;
+  height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid var(--accent-coral-dim);
+  opacity: 0;
+}
+.ring-1 { width: 140px; height: 140px; }
+.ring-2 { width: 190px; height: 190px; }
+.ring-3 { width: 240px; height: 240px; }
+
+.orb-rings.listening .ring {
+  border-color: var(--accent-blue-dim);
+  animation: ripple 2.2s ease-out infinite;
+}
+.orb-rings.listening .ring-2 { animation-delay: 0.4s; }
+.orb-rings.listening .ring-3 { animation-delay: 0.8s; }
+
+.orb-rings.speaking .ring {
+  animation: ripple 1.4s ease-out infinite;
+}
+.orb-rings.speaking .ring-2 { animation-delay: 0.25s; }
+.orb-rings.speaking .ring-3 { animation-delay: 0.5s; }
+
+@keyframes ripple {
+  0%   { transform: scale(0.6); opacity: 0.55; }
+  100% { transform: scale(1.05); opacity: 0; }
+}
+
+.orb {
+  width: 108px;
+  height: 108px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 35% 30%, #ffb08a 0%, var(--accent-coral) 55%, #d9642f 100%);
+  box-shadow: 0 0 40px var(--accent-coral-dim), inset 0 0 20px rgba(255,255,255,0.25);
+  transition: background 0.5s ease, box-shadow 0.5s ease, transform 0.4s ease;
+  z-index: 1;
+}
+
+.orb-core {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.85);
+  filter: blur(1px);
+}
+
+.orb.idle {
+  animation: breathe 3.6s ease-in-out infinite;
+}
+.orb.listening {
+  background: radial-gradient(circle at 35% 30%, #b9c9ff 0%, var(--accent-blue) 55%, #4c68c9 100%);
+  box-shadow: 0 0 50px var(--accent-blue-dim), inset 0 0 20px rgba(255,255,255,0.3);
+}
+.orb.thinking {
+  animation: spin 1.6s linear infinite;
+  background: conic-gradient(from 0deg, var(--accent-coral), var(--accent-blue), var(--accent-coral));
+}
+.orb.speaking {
+  animation: pulse-speak 0.9s ease-in-out infinite;
+}
+.orb.ended {
+  background: radial-gradient(circle at 35% 30%, #6b6480 0%, #443f5c 55%, #2c2740 100%);
+  box-shadow: none;
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes pulse-speak {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+
+.status-label {
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+  margin: 0;
+  margin-top: 140px;
+}
+
+/* ---------- Transcript ---------- */
+.transcript-wrap {
+  flex-shrink: 0;
+  height: 30vh;
+  min-height: 180px;
+  padding: 0 20px;
+}
+
+.transcript {
+  height: 100%;
+  overflow-y: auto;
+  background: var(--bg-panel);
+  border-radius: 18px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  scrollbar-width: thin;
+}
+
+.transcript-empty {
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+  margin: auto;
+}
+
+.bubble {
+  max-width: 82%;
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.bubble.user {
+  align-self: flex-end;
+  background: var(--accent-coral);
+  color: #241305;
+  border-bottom-right-radius: 4px;
+}
+
+.bubble.assistant {
+  align-self: flex-start;
+  background: var(--bg-panel-2);
+  color: var(--text-primary);
+  border-bottom-left-radius: 4px;
+}
+
+/* ---------- Controls ---------- */
+.call-controls {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  padding: 26px 20px 34px;
+}
+
+.call-btn {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 15px;
+  color: var(--text-primary);
+  background: var(--accent-coral);
+  border: none;
+  border-radius: 999px;
+  padding: 14px 32px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: background 0.25s ease, transform 0.15s ease;
+}
+
+.call-btn:hover { transform: translateY(-1px); }
+.call-btn:active { transform: translateY(0); }
+
+.call-btn-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #241305;
+}
+
+.call-btn.active {
+  background: var(--danger);
+}
+.call-btn.active .call-btn-dot {
+  background: #2b0009;
+}
+
+.call-btn.connecting {
+  background: var(--text-muted);
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orb, .ring { animation: none !important; }
+}

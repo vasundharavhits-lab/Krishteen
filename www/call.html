@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Krishteen — Call</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="call.css" />
+</head>
+<body>
+
+  <div class="call-screen">
+
+    <header class="call-header">
+      <a class="back-link" href="index.html" title="Back to chat">&larr; Chat</a>
+      <span class="call-title">KRISHTEEN</span>
+      <span class="call-timer" id="callTimer">00:00</span>
+    </header>
+
+    <main class="orb-stage">
+      <div class="orb-rings" id="orbRings">
+        <div class="ring ring-3"></div>
+        <div class="ring ring-2"></div>
+        <div class="ring ring-1"></div>
+      </div>
+      <div class="orb" id="orb">
+        <span class="orb-core"></span>
+      </div>
+      <p class="status-label" id="status">Tap to start the call</p>
+    </main>
+
+    <section class="transcript-wrap">
+      <div class="transcript" id="transcript">
+        <p class="transcript-empty" id="transcriptEmpty">Your conversation will appear here once the call connects.</p>
+      </div>
+    </section>
+
+    <footer class="call-controls">
+      <button class="call-btn" id="callBtn">
+        <span class="call-btn-dot"></span>
+        <span id="callBtnLabel">Start Call</span>
+      </button>
+    </footer>
+
+  </div>
+
+  <script type="text/javascript" src="/eel.js"></script>
+  <script type="text/javascript" src="call.js"></script>
+</body>
+</html>

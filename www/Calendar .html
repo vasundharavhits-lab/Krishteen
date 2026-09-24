@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Krishteen — Calendar</title>
+<link rel="stylesheet" href="calendar.css">
+<script type="text/javascript" src="/eel.js"></script>
+</head>
+<body>
+  <div class="cal-wrap">
+    <div class="cal-header">
+      <button id="prevMonth">&#8592;</button>
+      <h2 id="monthLabel">Month Year</h2>
+      <button id="nextMonth">&#8594;</button>
+      <a href="index.html" class="back-link">&larr; Back to Krishteen</a>
+    </div>
+
+    <div class="cal-grid" id="calGrid">
+      <div class="cal-daylabel">Sun</div>
+      <div class="cal-daylabel">Mon</div>
+      <div class="cal-daylabel">Tue</div>
+      <div class="cal-daylabel">Wed</div>
+      <div class="cal-daylabel">Thu</div>
+      <div class="cal-daylabel">Fri</div>
+      <div class="cal-daylabel">Sat</div>
+      <!-- day cells injected by JS -->
+    </div>
+
+    <div class="cal-panel" id="dayPanel">
+      <h3 id="dayPanelTitle">Select a day</h3>
+      <ul id="dayPanelList"></ul>
+    </div>
+  </div>
+
+  <script src="calendar.js"></script>
+</body>
+</html>

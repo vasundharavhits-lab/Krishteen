@@ -1,0 +1,14 @@
+envkrishteen/
+__pycache__
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.db
+uploads/
+.ollama/
+Ollama/models/
+ollama-models/
+*.gguf
+recovery code.txt

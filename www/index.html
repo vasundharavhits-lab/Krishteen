@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Krishteen</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+
+  <style>
+    /* ===== BASE ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d1b2a;
+      --surface:   #1a293e;
+      --surface2:  #223046;
+      --border:    #33445c;
+      --accent:    #2a5db0;
+      --accent2:   #4dabf7;
+      --text:      #e8edf3;
+      --text-muted:#8a9ab5;
+      --danger:    #e74c3c;
+      --green:     #2ecc71;
+      --radius:    10px;
+      --font-main: 'IBM Plex Sans', sans-serif;
+      --font-display: 'Space Grotesk', sans-serif;
+    }
+
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-main); }
+
+    /* ===== VIEWS ===== */
+    #viewMain, #viewCall { position: fixed; inset: 0; transition: opacity .35s, transform .35s; }
+    #viewCall  { opacity: 0; pointer-events: none; transform: translateY(30px); z-index: 100; background: var(--bg); }
+    #viewCall.active  { opacity: 1; pointer-events: all; transform: translateY(0); }
+    #viewMain.hidden  { opacity: 0; pointer-events: none; }
+
+    /* ===== LOADER / ORBS (main) ===== */
+    #loader-wrapper {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; padding: 40px 0 20px;
+    }
+    #loader { position: relative; width: 100px; height: 100px; margin-bottom: 16px; }
+    #loader1 {
+      width: 100px; height: 100px; border-radius: 50%;
+      background: radial-gradient(circle at 35% 38%, #4dabf7, #1a3a6e 60%);
+      box-shadow: 0 0 40px rgba(42,93,176,.55), 0 0 80px rgba(77,171,247,.25);
+      animation: breathe 3s ease-in-out infinite;
+    }
+    @keyframes breathe {
+      0%,100% { transform: scale(1); box-shadow: 0 0 40px rgba(42,93,176,.55), 0 0 80px rgba(77,171,247,.25); }
+      50%      { transform: scale(1.08); box-shadow: 0 0 60px rgba(42,93,176,.75), 0 0 120px rgba(77,171,247,.35); }
+    }
+    #loader-wrapper p {
+      font-family: var(--font-display); font-size: 1.35rem; font-weight: 700;
+      letter-spacing: .25em; text-transform: uppercase; color: var(--text);
+    }
+
+    /* ===== INPUT ROW ===== */
+    .main-content { max-width: 720px; margin: 0 auto; padding: 0 20px 120px; }
+
+    #textInput {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 50px; padding: 8px 12px;
+    }
+    .input-field {
+      flex: 1; background: transparent; border: none; outline: none;
+      color: var(--text); font-family: var(--font-main); font-size: .95rem;
+      padding: 4px 8px;
+    }
+    .input-field::placeholder { color: var(--text-muted); }
+
+    .glow-btn {
+      background: transparent; border: none; color: var(--text-muted);
+      cursor: pointer; width: 36px; height: 36px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.05rem; transition: color .2s, background .2s, box-shadow .2s;
+      flex-shrink: 0; text-decoration: none;
+    }
+    .glow-btn:hover { color: var(--accent2); background: rgba(77,171,247,.12); box-shadow: 0 0 10px rgba(77,171,247,.25); }
+    .glow-btn.active-btn { color: var(--accent2); background: rgba(77,171,247,.15); }
+
+    /* ===== WAKE INDICATOR ===== */
+    #wakeIndicator {
+      display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+      flex-shrink: 0; cursor: default; transition: background .2s, box-shadow .2s;
+    }
+    .wake-idle      { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+    .wake-listening { background: var(--accent2); box-shadow: 0 0 10px var(--accent2); animation: wakePulse 1s infinite; }
+    .wake-awake     { background: var(--green); box-shadow: 0 0 10px var(--green); }
+    .wake-off       { background: #555; box-shadow: none; }
+    @keyframes wakePulse { 0%,100%{opacity:.4} 50%{opacity:1} }
+
+    /* ===== HINT TEXT ===== */
+    .hint-text {
+      text-align: center; color: var(--text-muted); font-size: .82rem;
+      margin-top: 12px; line-height: 1.6;
+    }
+
+    /* ===== CHAT LOG (offcanvas) ===== */
+    .bubble-wrap { margin-bottom: 10px; }
+    .bubble-wrap.user  { text-align: right; }
+    .bubble-wrap.assistant { text-align: left; }
+    .bubble {
+      display: inline-block; padding: 9px 14px; border-radius: 12px;
+      max-width: 88%; font-size: .9rem; line-height: 1.5; text-align: left;
+      word-break: break-word;
+    }
+    .bubble-wrap.user .bubble      { background: var(--accent); color: #fff; border-bottom-right-radius: 3px; }
+    .bubble-wrap.assistant .bubble { background: var(--surface2); color: var(--text); border-bottom-left-radius: 3px; }
+    .bubble-label { font-size: .73rem; color: var(--text-muted); margin-bottom: 3px; }
+
+    /* ===== REMINDER TOAST ===== */
+    .reminder-toast {
+      position: fixed; top: 20px; right: -400px; max-width: 320px;
+      background: var(--surface); color: var(--text);
+      border: 1px solid var(--border); border-left: 4px solid var(--accent);
+      border-radius: 8px; padding: 12px 16px;
+      display: flex; align-items: center; gap: 10px;
+      box-shadow: 0 6px 18px rgba(0,0,0,.35); z-index: 2000;
+      transition: right .4s ease; font-size: .9rem;
+    }
+    .reminder-toast.show { right: 20px; }
+    .reminder-toast i { font-size: 1.2rem; color: var(--accent2); }
+
+    /* ===== OFFCANVAS overrides ===== */
+    .offcanvas { background: var(--surface) !important; color: var(--text) !important; }
+    .offcanvas-header { border-bottom: 1px solid var(--border) !important; }
+
+    /* ===== MODAL overrides ===== */
+    .modal-content { background: var(--surface) !important; color: var(--text) !important; border: 1px solid var(--border) !important; }
+    .modal-header  { border-bottom: 1px solid var(--border) !important; }
+    .modal-footer  { border-top: 1px solid var(--border) !important; }
+    .form-check-input:checked { background-color: var(--accent); border-color: var(--accent); }
+
+    /* Reminder list item */
+    .reminder-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+    }
+    .reminder-item:last-child { border-bottom: none; }
+
+    /* ===== SCROLLBAR ===== */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ===============================================================
+       CALL SCREEN
+    ================================================================ */
+    .call-screen {
+      display: flex; flex-direction: column; height: 100vh;
+      background: var(--bg); overflow: hidden;
+    }
+
+    .call-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 24px 14px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .back-link {
+      color: var(--text-muted); font-size: .9rem; text-decoration: none;
+      display: flex; align-items: center; gap: 6px; cursor: pointer;
+      transition: color .2s;
+    }
+    .back-link:hover { color: var(--text); }
+    .call-title {
+      font-family: var(--font-display); font-size: 1rem; font-weight: 700;
+      letter-spacing: .2em; text-transform: uppercase; color: var(--text);
+    }
+    .call-timer {
+      font-family: var(--font-display); font-size: .9rem;
+      color: var(--text-muted); letter-spacing: .05em; min-width: 52px; text-align: right;
+    }
+
+    .orb-stage {
+      flex: 0 0 auto; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; padding: 30px 20px 20px;
+      position: relative;
+    }
+    .orb-outer { position: relative; width: 150px; height: 150px; display: flex; align-items: center; justify-content: center; }
+
+    .rings { position: absolute; inset: 0; }
+    .ring {
+      position: absolute; border-radius: 50%; border: 1.5px solid rgba(77,171,247,.18);
+      transform: translate(-50%,-50%); left: 50%; top: 50%;
+      animation: none;
+    }
+    .ring-1 { width: 170px; height: 170px; }
+    .ring-2 { width: 210px; height: 210px; }
+    .ring-3 { width: 255px; height: 255px; }
+
+    .rings.listening .ring, .rings.speaking .ring { animation: ringPulse 2s ease-in-out infinite; }
+    .rings.listening .ring-1 { animation-delay: 0s; }
+    .rings.listening .ring-2 { animation-delay: .25s; }
+    .rings.listening .ring-3 { animation-delay: .5s; }
+    .rings.speaking .ring-1 { animation-delay: 0s; border-color: rgba(46,204,113,.22); }
+    .rings.speaking .ring-2 { animation-delay: .2s; border-color: rgba(46,204,113,.14); }
+    .rings.speaking .ring-3 { animation-delay: .4s; border-color: rgba(46,204,113,.08); }
+    @keyframes ringPulse {
+      0%,100%{ opacity:.3; transform: translate(-50%,-50%) scale(1); }
+      50%    { opacity:.9; transform: translate(-50%,-50%) scale(1.06); }
+    }
+
+    .orb {
+      width: 110px; height: 110px; border-radius: 50%; z-index: 2;
+      background: radial-gradient(circle at 35% 38%, #4dabf7, #1a3a6e 65%);
+      box-shadow: 0 0 35px rgba(42,93,176,.6), 0 0 70px rgba(77,171,247,.2);
+      transition: box-shadow .4s, background .4s;
+      animation: orbBreath 3.5s ease-in-out infinite;
+    }
+    .orb.listening {
+      background: radial-gradient(circle at 35% 38%, #74c5f7, #1a4a8e 65%);
+      box-shadow: 0 0 45px rgba(77,171,247,.75), 0 0 90px rgba(77,171,247,.3);
+      animation: orbListening 1.2s ease-in-out infinite;
+    }
+    .orb.speaking {
+      background: radial-gradient(circle at 35% 38%, #5ef5a0, #1a5e3e 65%);
+      box-shadow: 0 0 45px rgba(46,204,113,.75), 0 0 90px rgba(46,204,113,.3);
+      animation: orbSpeaking .8s ease-in-out infinite;
+    }
+    .orb.thinking {
+      background: radial-gradient(circle at 35% 38%, #f7c948, #5e3a1a 65%);
+      box-shadow: 0 0 40px rgba(247,201,72,.6), 0 0 80px rgba(247,201,72,.2);
+      animation: orbThink 2s linear infinite;
+    }
+    .orb.connecting {
+      background: radial-gradient(circle at 35% 38%, #aab4c8, #2a3550 65%);
+      animation: orbBreath 1s ease-in-out infinite;
+    }
+    @keyframes orbBreath  { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
+    @keyframes orbListening{ 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+    @keyframes orbSpeaking { 0%,100%{transform:scale(1)} 25%{transform:scale(1.12)} 75%{transform:scale(.97)} }
+    @keyframes orbThink    { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
+
+    .status-label {
+      margin-top: 18px; font-family: var(--font-display); font-size: .9rem;
+      color: var(--text-muted); letter-spacing: .08em;
+    }
+
+    .transcript-wrap {
+      flex: 1; overflow: hidden; padding: 0 20px;
+      display: flex; flex-direction: column;
+    }
+    .transcript {
+      flex: 1; overflow-y: auto; display: flex; flex-direction: column;
+      gap: 8px; padding: 10px 0;
+    }
+    .transcript-empty { color: var(--text-muted); font-size: .87rem; text-align: center; margin-top: 16px; }
+
+    .c-bubble {
+      padding: 9px 14px; border-radius: 12px;
+      max-width: 85%; font-size: .9rem; line-height: 1.5; word-break: break-word;
+    }
+    .c-bubble.user      { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 3px; }
+    .c-bubble.assistant { align-self: flex-start; background: var(--surface2); color: var(--text); border-bottom-left-radius: 3px; }
+
+    .call-controls {
+      flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      padding: 20px 20px 36px;
+    }
+    .call-btn {
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px 32px; border: none; border-radius: 50px; cursor: pointer;
+      font-family: var(--font-display); font-size: .9rem; font-weight: 700;
+      letter-spacing: .08em; text-transform: uppercase;
+      background: var(--accent); color: #fff;
+      box-shadow: 0 4px 18px rgba(42,93,176,.45);
+      transition: background .25s, box-shadow .25s, transform .1s;
+    }
+    .call-btn:hover  { background: #3470cc; box-shadow: 0 6px 24px rgba(42,93,176,.6); }
+    .call-btn:active { transform: scale(.97); }
+    .call-btn.active { background: var(--danger); box-shadow: 0 4px 18px rgba(231,76,60,.45); }
+    .call-btn.active:hover { background: #c0392b; }
+    .call-btn.connecting { background: var(--surface2); color: var(--text-muted); cursor: not-allowed; box-shadow: none; }
+
+    .call-btn-dot {
+      width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,.6);
+      flex-shrink: 0;
+    }
+    .call-btn.active .call-btn-dot { background: rgba(255,255,255,.9); animation: dotBlink .8s infinite; }
+    @keyframes dotBlink { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+    .text-muted-custom { color: var(--text-muted) !important; }
+    .section-gap { margin-top: 60px; }
+  </style>
+</head>
+<body>
+
+<!-- ================================================
+     MAIN SCREEN
+================================================ -->
+<div id="viewMain" class="d-flex flex-column align-items-center" style="min-height:100vh; overflow-y:auto;">
+
+  <div class="main-content w-100">
+
+    <div id="loader-wrapper" class="section-gap">
+      <div id="loader"><div id="loader1"></div></div>
+      <p>krishteen</p>
+    </div>
+    <h5 class="text-center mb-4" style="color:var(--text-muted); font-size:.95rem; font-weight:400;">Ask me anything</h5>
+
+    <div id="textInput">
+      <input type="text" class="input-field" id="chatbox" placeholder="type here…" autocomplete="off" />
+      <button class="glow-btn" id="AttachBtn" title="Attach a PDF, photo or video"><i class="bi bi-paperclip"></i></button>
+      <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.mp3,.wav,.m4a,.ogg,.aac,.flac,.mp4,.mov,.avi,.mkv" style="display:none" />
+      <button class="glow-btn" id="MicBtn" title="Voice input"><i class="bi bi-mic"></i></button>
+      <span id="wakeIndicator" class="wake-idle" title='Say "Hey Krishteen" anytime'></span>
+      <button class="glow-btn" id="RemindersBtn" title="Alarms & Reminders" data-bs-toggle="modal" data-bs-target="#remindersModal"><i class="bi bi-alarm"></i></button>
+      <button class="glow-btn" id="CallBtnLink" title="Start a live call"><i class="bi bi-telephone"></i></button>
+      <button class="glow-btn" id="ChatBtn" title="Chat history" data-bs-toggle="offcanvas" data-bs-target="#offcanvasChat"><i class="bi bi-chat-dots"></i></button>
+      <button class="glow-btn" id="SettingsBtn" title="Settings" data-bs-toggle="modal" data-bs-target="#settingsModal"><i class="bi bi-gear"></i></button>
+    </div>
+
+    <p id="wakeStatusLine" class="hint-text mt-1" style="opacity:.75; font-size:.78rem;"></p>
+
+    <div id="inlineChat" style="margin-top:28px; display:none; max-height:340px; overflow-y:auto;" class="d-flex flex-column gap-2"></div>
+
+  </div>
+</div>
+
+
+<!-- ================================================
+     CALL SCREEN
+================================================ -->
+<div id="viewCall">
+  <div class="call-screen">
+
+    <header class="call-header">
+      <span class="back-link" id="backToMain"><i class="bi bi-arrow-left me-1"></i> Chat</span>
+      <span class="call-title">KRISHTEEN</span>
+      <span class="call-timer" id="callTimer">00:00</span>
+    </header>
+
+    <main class="orb-stage">
+      <div class="orb-outer">
+        <div class="rings" id="orbRings"></div>
+        <div class="orb" id="callOrb"></div>
+      </div>
+      <p class="status-label" id="callStatus">Tap to start the call</p>
+    </main>
+
+    <section class="transcript-wrap">
+      <div class="transcript" id="callTranscript">
+        <p class="transcript-empty" id="transcriptEmpty">Your conversation will appear here once the call connects.</p>
+      </div>
+    </section>
+
+    <footer class="call-controls">
+      <button class="call-btn" id="callBtn">
+        <span class="call-btn-dot"></span>
+        <span id="callBtnLabel">Start Call</span>
+      </button>
+    </footer>
+
+  </div>
+</div>
+
+
+<!-- ================================================
+     OFFCANVAS — Chat History
+================================================ -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasChat">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" style="font-family:var(--font-display); letter-spacing:.05em;">Chat History</h5>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+  </div>
+  <div class="offcanvas-body">
+    <div id="chatLog" style="display:flex; flex-direction:column; gap:10px; overflow-y:auto; max-height:85vh;"></div>
+  </div>
+</div>
+
+
+<!-- ================================================
+     MODAL — Settings
+================================================ -->
+<div class="modal fade" id="settingsModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" style="font-family:var(--font-display);">Settings</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-check form-switch mb-4 pb-3" style="border-bottom:1px solid var(--border);">
+          <input class="form-check-input" type="checkbox" role="switch" id="wakeWordToggle" checked />
+          <label class="form-check-label" for="wakeWordToggle">
+            <i class="bi bi-mic-fill me-1" style="color:var(--accent2);"></i>
+            Hands-free "Hey Krishteen" wake word
+          </label>
+          <div class="mt-1" style="font-size:.8rem; color:var(--text-muted);">
+            When on, Krishteen is always listening in the background for its name — say "Hey Krishteen" anytime, no clicking needed.
+          </div>
+        </div>
+
+        <p class="mb-3" style="font-size:.9rem;">Choose how you'd like the assistant to answer your questions:</p>
+        <div id="styleOptions">
+          <!-- populated live from eel.getResponseStyle() -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" id="saveStyleBtn" data-bs-dismiss="modal">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ================================================
+     MODAL — Alarms & Reminders
+================================================ -->
+<div class="modal fade" id="remindersModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" style="font-family:var(--font-display);">
+          <i class="bi bi-alarm me-2" style="color:var(--accent2);"></i>Alarms & Reminders
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:.83rem; color:var(--text-muted); margin-bottom:16px;">
+          Say or type things like "set an alarm for 7 am", "remind me to call mom at 6 pm", or "book an appointment with the dentist tomorrow at 3 pm" — they'll appear here.
+        </p>
+        <div id="remindersList">
+          <!-- populated live from eel.getUpcomingReminders() -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- REAL eel connection — this was missing entirely before -->
+<script type="text/javascript" src="/eel.js"></script>
+
+<script>
+/* =====================================================
+   MAIN SCREEN — real backend wiring (no more fake demos)
+====================================================== */
+
+const viewMain = document.getElementById('viewMain');
+const viewCall = document.getElementById('viewCall');
+const wakeEl = document.getElementById('wakeIndicator');
+const chatbox = document.getElementById('chatbox');
+
+/* ---- Wake indicator, driven by real wakeword.py state ---- */
+function setWakeIndicator(state) {
+  wakeEl.className = 'wake-' + state;
+  const titles = { idle:'Say "Hey Krishteen" anytime', listening:'Listening…', awake:'Woke up!', off:'"Hey Krishteen" is off' };
+  wakeEl.title = titles[state] || '';
+}
+eel.expose(WakeWordState);
+function WakeWordState(state) { setWakeIndicator(state); }
+
+/* ---- Chat bubble helper ---- */
+function addChatMessage(role, text) {
+  const log = document.getElementById('chatLog');
+  const inline = document.getElementById('inlineChat');
+
+  const wrap = document.createElement('div');
+  wrap.className = 'bubble-wrap ' + role;
+  const label = document.createElement('div');
+  label.className = 'bubble-label';
+  label.textContent = role === 'user' ? 'You' : 'Krishteen';
+  const bub = document.createElement('div');
+  bub.className = 'bubble';
+  bub.textContent = text;
+  wrap.appendChild(label);
+  wrap.appendChild(bub);
+
+  log.appendChild(wrap.cloneNode(true));
+  log.scrollTop = log.scrollHeight;
+
+  inline.style.display = 'flex';
+  inline.appendChild(wrap);
+  inline.scrollTop = inline.scrollHeight;
+}
+window.addChatMessage = addChatMessage;
+
+/* ---- Functions Python calls into (matches command.py's eel usage) ---- */
+eel.expose(DisplayMessage);
+function DisplayMessage(message) {
+  // Transient status text (e.g. "Listening...", "Thinking..."). Shown as
+  // the input placeholder so it's visible without cluttering the chat log.
+  chatbox.placeholder = message;
+}
+
+eel.expose(ShowHood);
+function ShowHood() {
+  chatbox.disabled = false;
+  chatbox.placeholder = 'type here…';
+}
+
+eel.expose(LogUserMessage);
+function LogUserMessage(message) { addChatMessage('user', message); }
+
+eel.expose(LogAssistantMessage);
+function LogAssistantMessage(message) { addChatMessage('assistant', message); }
+
+eel.expose(ReminderFired);
+function ReminderFired(message, kind) {
+  const iconMap = { alarm:'bi-alarm', reminder:'bi-bell', appointment:'bi-calendar-event' };
+  addChatMessage('assistant', message);
+  showReminderToast(message, iconMap[kind] || 'bi-bell');
+}
+
+/* ---- Typing: sends to the real Python router ---- */
+function sendTypedMessage() {
+  const text = chatbox.value.trim();
+  if (!text) return;
+  chatbox.value = '';
+  chatbox.disabled = true;
+  eel.allCommands(text)();
+}
+chatbox.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); sendTypedMessage(); } });
+
+/* ---- Mic button: records in THIS BROWSER, works for anyone viewing
+   the page — not just whoever is at the Krishteen computer. Replaces the
+   old eel.allCommands() call, which used to trigger Python's own local
+   microphone (only ever worked for the person physically at that PC). ---- */
+let micRecorder = null;
+let micChunks = [];
+let micRecording = false;
+let micStream = null;
+let micAudioCtx = null;
+let micAnalyser = null;
+let micPollHandle = null;
+const micBtn = document.getElementById('MicBtn');
+
+// Tuned to match call.js's auto-stop logic: instead of relying on the
+// person clicking "stop" at exactly the right moment (a click a beat too
+// early/late clips the recording — that's what was producing
+// mis-transcriptions and "I couldn't detect any speech" replies), we
+// detect silence ourselves and stop automatically once they've clearly
+// finished talking.
+const MIC_SPEAK_RMS_THRESHOLD = 0.02;   // volume level counted as "talking"
+const MIC_SILENCE_AFTER_SPEECH_MS = 1200; // auto-stop after this much quiet, once speech was heard
+const MIC_NO_SPEECH_TIMEOUT_MS = 8000;    // give up if nothing crosses the threshold at all
+const MIC_MAX_RECORDING_MS = 20000;       // hard cap so one long ramble can't run forever
+const MIC_MIN_SPEECH_MS = 400;            // ignore blips shorter than this (coughs, clicks)
+const MIC_POLL_MS = 100;
+
+function micCurrentRms() {
+  const data = new Uint8Array(micAnalyser.fftSize);
+  micAnalyser.getByteTimeDomainData(data);
+  let sumSquares = 0;
+  for (let i = 0; i < data.length; i++) {
+    const norm = (data[i] - 128) / 128;
+    sumSquares += norm * norm;
+  }
+  return Math.sqrt(sumSquares / data.length);
+}
+
+async function startMicRecording() {
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (err) {
+    alert("Couldn't access your microphone: " + err.message + "\nCheck your browser's microphone permission for this page.");
+    return;
+  }
+
+  micAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const source = micAudioCtx.createMediaStreamSource(micStream);
+  micAnalyser = micAudioCtx.createAnalyser();
+  micAnalyser.fftSize = 2048;
+  source.connect(micAnalyser);
+
+  micChunks = [];
+  micRecorder = new MediaRecorder(micStream);
+  micRecorder.ondataavailable = e => { if (e.data.size > 0) micChunks.push(e.data); };
+  micRecorder.onstop = () => {
+    micStream.getTracks().forEach(track => track.stop());
+    micAudioCtx.close().catch(() => {});
+    handleMicRecordingStopped();
+  };
+  micRecorder.start();
+  micRecording = true;
+  micBtn.classList.add('active-btn');
+  chatbox.placeholder = 'Listening… (auto-stops when you go quiet — click the mic to stop sooner)';
+
+  // --- Auto-stop watcher ---
+  let spokeAny = false;
+  let speechMs = 0;
+  let lastLoudAt = Date.now();
+  const startedAt = Date.now();
+
+  micPollHandle = setInterval(() => {
+    if (!micRecording) return;
+    const rms = micCurrentRms();
+    const now = Date.now();
+
+    if (rms > MIC_SPEAK_RMS_THRESHOLD) {
+      spokeAny = true;
+      speechMs += MIC_POLL_MS;
+      lastLoudAt = now;
+    }
+
+    if (!spokeAny && now - startedAt > MIC_NO_SPEECH_TIMEOUT_MS) {
+      stopMicRecording();
+      return;
+    }
+    if (spokeAny && speechMs >= MIC_MIN_SPEECH_MS && now - lastLoudAt > MIC_SILENCE_AFTER_SPEECH_MS) {
+      stopMicRecording();
+      return;
+    }
+    if (now - startedAt > MIC_MAX_RECORDING_MS) {
+      stopMicRecording();
+      return;
+    }
+  }, MIC_POLL_MS);
+}
+
+function stopMicRecording() {
+  if (micPollHandle) {
+    clearInterval(micPollHandle);
+    micPollHandle = null;
+  }
+  if (micRecorder && micRecording) {
+    micRecorder.stop();
+    micRecording = false;
+    micBtn.classList.remove('active-btn');
+  }
+}
+
+function handleMicRecordingStopped() {
+  const blob = new Blob(micChunks, { type: 'audio/webm' });
+  chatbox.disabled = true;
+  chatbox.placeholder = 'Processing your voice message…';
+
+  const reader = new FileReader();
+  reader.onload = async evt => {
+    const base64Audio = evt.target.result; // data:audio/webm;base64,...
+    try {
+      const result = await eel.handleVoiceMessage(base64Audio)();
+      if (result.query) addChatMessage('user', result.query);
+      addChatMessage('assistant', result.response);
+      if (result.audio_base64) {
+        const audio = new Audio('data:audio/wav;base64,' + result.audio_base64);
+        audio.play().catch(e => console.warn('Autoplay blocked, click the page first:', e));
+      }
+    } catch (err) {
+      addChatMessage('assistant', 'Sorry, something went wrong processing that: ' + err);
+    } finally {
+      chatbox.disabled = false;
+      chatbox.placeholder = 'type here…';
+    }
+  };
+  reader.onerror = () => {
+    alert("Couldn't process that recording.");
+    chatbox.disabled = false;
+    chatbox.placeholder = 'type here…';
+  };
+  reader.readAsDataURL(blob);
+}
+
+micBtn.addEventListener('click', () => {
+  eel.playClickSound();
+  if (!micRecording) {
+    startMicRecording();
+  } else {
+    stopMicRecording(); // manual early-stop still works, e.g. if you want to send a very short message
+  }
+});
+
+/* ---- Attach: real file upload ---- */
+document.getElementById('AttachBtn').addEventListener('click', () => {
+  const fi = document.getElementById('fileInput');
+  fi.value = '';
+  fi.click();
+});
+document.getElementById('fileInput').addEventListener('change', function () {
+  const file = this.files[0];
+  if (!file) return;
+
+  const question = chatbox.value.trim();
+  chatbox.value = '';
+
+  const ext = file.name.split('.').pop().toLowerCase();
+  let filetype;
+  if (ext === 'pdf') filetype = 'pdf';
+  else if (['png','jpg','jpeg','gif','webp'].includes(ext)) filetype = 'image';
+  else if (['mp3','wav','m4a','ogg','aac','flac'].includes(ext)) filetype = 'audio';
+  else if (['mp4','mov','avi','mkv'].includes(ext)) filetype = 'video';
+  else { alert('Unsupported file type: .' + ext); return; }
+
+  const reader = new FileReader();
+  reader.onload = evt => { eel.handleFileUpload(file.name, filetype, evt.target.result, question)(); };
+  reader.onerror = () => alert("Couldn't read that file.");
+  reader.readAsDataURL(file);
+});
+
+/* ---- Settings modal: real style + wake word toggle ---- */
+const settingsModalEl = document.getElementById('settingsModal');
+settingsModalEl.addEventListener('show.bs.modal', () => {
+  eel.getResponseStyle()(function (data) {
+    let html = '';
+    data.options.forEach(opt => {
+      const checked = (opt.key === data.current) ? 'checked' : '';
+      html += '<div class="form-check mb-2">' +
+        '<input class="form-check-input" type="radio" name="styleChoice" id="style_' + opt.key + '" value="' + opt.key + '" ' + checked + '>' +
+        '<label class="form-check-label" for="style_' + opt.key + '">' + opt.label + '</label>' +
+        '</div>';
+    });
+    document.getElementById('styleOptions').innerHTML = html;
+  });
+  eel.getWakeWordEnabled()(function (enabled) {
+    document.getElementById('wakeWordToggle').checked = !!enabled;
+  });
+});
+document.getElementById('saveStyleBtn').addEventListener('click', () => {
+  const selected = document.querySelector("input[name='styleChoice']:checked");
+  if (selected) eel.setResponseStyle(selected.value)();
+});
+document.getElementById('wakeWordToggle').addEventListener('change', function () {
+  // Also tells the Python side (engine/wakeword.py), which controls wake-word
+  // listening on the HOST computer's own mic — separate from the browser
+  // listener below, which is what makes "Hey Krishteen" work for anyone
+  // viewing the page remotely (e.g. over an ngrok link).
+  eel.setWakeWordEnabled(this.checked)();
+  setBrowserWakeWordEnabled(this.checked);
+});
+
+/* ---- Reminders modal: real list from scheduler.py ---- */
+const KIND_ICON = { alarm:'bi-alarm', reminder:'bi-bell', appointment:'bi-calendar-event' };
+function loadReminders() {
+  eel.getUpcomingReminders()(function (items) {
+    const list = document.getElementById('remindersList');
+    if (!items || items.length === 0) {
+      list.innerHTML = '<p class="text-muted-custom mb-0">Nothing scheduled yet. Try saying "remind me to call mom at 6pm".</p>';
+      return;
+    }
+    let html = '';
+    items.forEach(it => {
+      const icon = KIND_ICON[it.kind] || 'bi-bell';
+      const when = new Date(it.due_at).toLocaleString();
+      html += '<div class="reminder-item">' +
+        '<div><i class="bi ' + icon + ' me-2" style="color:var(--accent2);"></i>' +
+        '<strong>' + it.title + '</strong>' +
+        '<div style="font-size:.78rem; color:var(--text-muted); margin-left:24px;">' + when + '</div></div>' +
+        '<button class="btn btn-sm btn-outline-danger cancel-reminder-btn" data-id="' + it.id + '"><i class="bi bi-x-lg"></i></button>' +
+        '</div>';
+    });
+    list.innerHTML = html;
+  });
+}
+document.getElementById('remindersModal').addEventListener('show.bs.modal', loadReminders);
+document.getElementById('remindersModal').addEventListener('click', function (e) {
+  const btn = e.target.closest('.cancel-reminder-btn');
+  if (!btn) return;
+  eel.cancelReminderById(btn.dataset.id)(loadReminders);
+});
+
+/* ---- Reminder toast (fires only on a REAL ReminderFired event now) ---- */
+function showReminderToast(message, icon) {
+  const toast = document.createElement('div');
+  toast.className = 'reminder-toast';
+  toast.innerHTML = '<i class="bi ' + icon + '"></i><span></span>';
+  toast.querySelector('span').textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.classList.add('show'), 10);
+  setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 400); }, 6000);
+}
+window.showReminderToast = showReminderToast;
+
+
+/* =====================================================
+   CALL SCREEN — real eel wiring (matches engine/call.py)
+====================================================== */
+
+let callActive = false, callConnecting = false;
+let timerInterval = null, secondsElapsed = 0;
+
+const callOrb = document.getElementById('callOrb');
+const orbRings = document.getElementById('orbRings');
+const callStatus = document.getElementById('callStatus');
+const callBtn = document.getElementById('callBtn');
+const callBtnLabel = document.getElementById('callBtnLabel');
+const callTimer = document.getElementById('callTimer');
+const callTranscript = document.getElementById('callTranscript');
+
+document.getElementById('CallBtnLink').addEventListener('click', () => {
+  viewCall.classList.add('active');
+  viewMain.classList.add('hidden');
+});
+document.getElementById('backToMain').addEventListener('click', () => {
+  viewCall.classList.remove('active');
+  viewMain.classList.remove('hidden');
+  if (callActive) eel.endCall()();
+});
+
+function setCallState(state) {
+  const labels = { connecting:'Connecting…', connected:'Connected', listening:'Listening…', thinking:'Thinking…', speaking:'Speaking…', ended:'Call ended', idle:'Tap to start the call' };
+  callStatus.textContent = labels[state] || state;
+
+  callOrb.className = 'orb ' + (state === 'idle' ? '' : state);
+  orbRings.className = 'rings ' + (state === 'listening' || state === 'speaking' ? state : '');
+
+  if (!orbRings.children.length || orbRings.dataset.state !== state) {
+    orbRings.innerHTML = '<div class="ring ring-3"></div><div class="ring ring-2"></div><div class="ring ring-1"></div>';
+    orbRings.dataset.state = state;
+  }
+}
+
+function startTimer() {
+  secondsElapsed = 0; callTimer.textContent = '00:00';
+  timerInterval = setInterval(() => {
+    secondsElapsed++;
+    callTimer.textContent = String(Math.floor(secondsElapsed/60)).padStart(2,'0') + ':' + String(secondsElapsed%60).padStart(2,'0');
+  }, 1000);
+}
+function stopTimer() { clearInterval(timerInterval); timerInterval = null; }
+
+function addCallBubble(role, text) {
+  const empty = document.getElementById('transcriptEmpty');
+  if (empty) empty.remove();
+  const b = document.createElement('div');
+  b.className = 'c-bubble ' + role;
+  b.textContent = text;
+  callTranscript.appendChild(b);
+  callTranscript.scrollTop = callTranscript.scrollHeight;
+}
+
+/* These three are called by engine/call.py during a live mic-based call */
+eel.expose(CallStatus);
+function CallStatus(state) {
+  setCallState(state);
+  if (state === 'connected') {
+    callConnecting = false; callActive = true;
+    callBtn.classList.remove('connecting'); callBtn.classList.add('active');
+    callBtnLabel.textContent = 'End Call';
+    startTimer();
+  }
+  if (state === 'ended') {
+    callActive = false; callConnecting = false;
+    callBtn.classList.remove('active', 'connecting');
+    callBtnLabel.textContent = 'Start Call';
+    stopTimer();
+  }
+}
+
+eel.expose(CallUserMessage);
+function CallUserMessage(text) { addCallBubble('user', text); }
+
+eel.expose(CallAssistantMessage);
+function CallAssistantMessage(text) { addCallBubble('assistant', text); }
+
+callBtn.addEventListener('click', async () => {
+  if (callConnecting) return;
+  if (!callActive) {
+    callConnecting = true;
+    callBtn.classList.add('connecting');
+    callBtnLabel.textContent = 'Connecting…';
+    callTranscript.innerHTML = '<p class="transcript-empty" id="transcriptEmpty">Your conversation will appear here once the call connects.</p>';
+    setCallState('connecting');
+    await eel.startCall()();
+  } else {
+    callBtnLabel.textContent = 'Ending…';
+    await eel.endCall()();
+  }
+});
+
+setCallState('idle');
+
+
+/* =====================================================
+   BROWSER WAKE WORD — "Hey Krishteen", hands-free, works
+   for ANYONE viewing the page (not just the host computer).
+
+   engine/wakeword.py only ever listens through the host PC's own
+   microphone, so it can't hear a remote visitor at all (e.g. over an
+   ngrok link). This runs the same idea entirely inside THIS browser tab
+   using the Web Speech API, and reuses eel.getTextResponse() (text in,
+   text out — no server-side mic/speaker involved) plus the browser's own
+   speechSynthesis for the reply, so both the listening and the talking
+   happen on the visitor's own device.
+
+   Needs one mic permission grant per browser (unavoidable — browsers
+   require it before any JS can touch the microphone), same as the mic
+   button above. After that it keeps listening in the background with no
+   further clicks, same as the "no clicking needed" hint text promises.
+
+   Browser support: Chrome/Edge (and most Chromium browsers) support this
+   via webkitSpeechRecognition. Firefox and Safari don't support the Web
+   Speech API's continuous recognition mode at all — on those, this
+   quietly stays off and only the mic/type paths work.
+====================================================== */
+
+const SpeechRecognitionImpl = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+const WAKE_PHRASES = ["hey krishteen", "ok krishteen", "hi krishteen", "okay krishteen", "krishteen"];
+const WAKE_WORD_VARIANTS = [
+  "krishteen", "kristeen", "christine", "kristen", "christina", "cristina",
+  "christeen", "krishtin", "krishten", "kristina", "christin", "krishtine",
+];
+const ACK_PHRASES = ["Yes?", "I'm listening.", "Go ahead.", "Yes, how can I help?"];
+
+let browserWakeEnabled = false;   // mirrors the Settings toggle, for THIS browser
+let bwRecognition = null;
+let bwMode = "idle";              // 'idle' (background listen) | 'command' (one-shot, post-wake)
+let bwAckIndex = 0;
+let bwRestartTimer = null;
+let bwConsecutiveNetworkErrors = 0;
+
+// Visible line under the hint text so a remote tester can literally read
+// off (or screenshot) why wake word isn't working, instead of it just
+// silently doing nothing with no way for you to know why.
+const wakeStatusLine = document.getElementById('wakeStatusLine');
+function bwSetStatusLine(text) {
+  if (wakeStatusLine) wakeStatusLine.textContent = text;
+}
+
+// Small Levenshtein distance, used to fuzzy-match mishearings the same
+// way engine/wakeword.py's difflib.get_close_matches(cutoff=0.72) does.
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j - 1], dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+function closeMatch(word, variants, cutoff = 0.72) {
+  for (const v of variants) {
+    const dist = levenshtein(word, v);
+    const ratio = 1 - dist / Math.max(word.length, v.length);
+    if (ratio >= cutoff) return true;
+  }
+  return false;
+}
+function containsWakeWord(text) {
+  const lowered = text.toLowerCase();
+  if (WAKE_PHRASES.some(p => lowered.includes(p))) return true;
+  const words = lowered.match(/[a-z']+/g) || [];
+  return words.some(w => w.length >= 4 && closeMatch(w, WAKE_WORD_VARIANTS));
+}
+function extractAfterWake(text) {
+  const lowered = text.toLowerCase();
+  for (const phrase of WAKE_PHRASES) {
+    const idx = lowered.indexOf(phrase);
+    if (idx !== -1) return text.slice(idx + phrase.length).trim().replace(/^[,.\s]+/, '');
+  }
+  const words = lowered.match(/[a-z']+/g) || [];
+  for (const w of words) {
+    if (w.length >= 4 && closeMatch(w, WAKE_WORD_VARIANTS)) {
+      const idx = lowered.indexOf(w);
+      return text.slice(idx + w.length).trim().replace(/^[,.\s]+/, '');
+    }
+  }
+  return "";
+}
+
+function bwSpeak(text) {
+  try {
+    const utter = new SpeechSynthesisUtterance(text);
+    speechSynthesis.speak(utter);
+  } catch (e) { console.warn('[wake] speechSynthesis error:', e); }
+}
+
+// True while something else needs the mic/UI: on the call screen, mid mic
+// recording, or already processing a typed/voice message.
+function bwShouldPause() {
+  return callActive || callConnecting || micRecording || chatbox.disabled;
+}
+
+async function bwRouteQuery(query) {
+  addChatMessage('user', query);
+  chatbox.disabled = true;
+  chatbox.placeholder = 'Thinking…';
+  try {
+    const response = await new Promise((resolve, reject) => {
+      eel.getTextResponse(query)(resolve);
+      // eel calls never reject on their own; a stalled call just never resolves.
+    });
+    addChatMessage('assistant', response);
+    bwSpeak(response);
+  } catch (e) {
+    addChatMessage('assistant', 'Sorry, something went wrong: ' + e);
+  } finally {
+    chatbox.disabled = false;
+    chatbox.placeholder = 'type here…';
+  }
+}
+
+function bwStartRecognition(mode) {
+  if (!SpeechRecognitionImpl || !browserWakeEnabled) return;
+  bwMode = mode;
+
+  bwRecognition = new SpeechRecognitionImpl();
+  bwRecognition.lang = 'en-US';
+  bwRecognition.continuous = (mode === 'idle');
+  bwRecognition.interimResults = false;
+
+  bwRecognition.onstart = () => {
+    bwConsecutiveNetworkErrors = 0;
+    bwSetStatusLine(mode === 'idle' ? 'Hey Krishteen: listening in the background' : 'Hey Krishteen: go ahead, I\'m listening…');
+  };
+
+  bwRecognition.onresult = (event) => {
+    const result = event.results[event.results.length - 1];
+    if (!result.isFinal) return;
+    const heard = result[0].transcript.trim();
+    if (!heard) return;
+
+    if (bwMode === 'idle') {
+      if (!containsWakeWord(heard)) return;
+      setWakeIndicator('awake');
+      bwSetStatusLine('Hey Krishteen: woke up!');
+      const immediate = extractAfterWake(heard);
+      try { bwRecognition.stop(); } catch (e) {}
+      if (immediate) {
+        bwRouteQuery(immediate).finally(() => bwScheduleRestart());
+      } else {
+        const ack = ACK_PHRASES[bwAckIndex % ACK_PHRASES.length];
+        bwAckIndex++;
+        bwSpeak(ack);
+        setWakeIndicator('listening');
+        setTimeout(() => bwStartRecognition('command'), 700); // let the ack finish starting
+      }
+    } else {
+      // one-shot follow-up after the wake word
+      try { bwRecognition.stop(); } catch (e) {}
+      bwRouteQuery(heard).finally(() => bwScheduleRestart());
+    }
+  };
+
+  bwRecognition.onerror = (event) => {
+    if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+      browserWakeEnabled = false;
+      document.getElementById('wakeWordToggle').checked = false;
+      setWakeIndicator('off');
+      bwSetStatusLine('Hey Krishteen: blocked — microphone access was denied for this page.');
+      alert('Microphone access was blocked, so "Hey Krishteen" can\'t listen in this browser. Allow microphone access for this page (click the lock/site-info icon in the address bar) and turn the toggle back on in Settings.');
+      return;
+    }
+    if (event.error === 'network') {
+      // The Web Speech API sends audio to Google's recognition servers —
+      // this fires if that request can't get through (e.g. firewall,
+      // restrictive network, or the page itself isn't served over HTTPS).
+      bwConsecutiveNetworkErrors++;
+      if (bwConsecutiveNetworkErrors === 3) {
+        const insecure = !window.isSecureContext;
+        bwSetStatusLine(insecure
+          ? 'Hey Krishteen: can\'t reach the speech service — this page needs to be opened over HTTPS.'
+          : 'Hey Krishteen: can\'t reach the speech service — check this network\'s internet/firewall.');
+      }
+      bwScheduleRestart();
+      return;
+    }
+    // 'no-speech', 'aborted', etc. — expected during normal idle gaps, just retry quietly
+    bwScheduleRestart();
+  };
+
+  bwRecognition.onend = () => {
+    if (bwMode === 'command') {
+      // No follow-up heard within the recognizer's own timeout — go back
+      // to idle listening rather than staying stuck waiting.
+      bwScheduleRestart();
+      return;
+    }
+    if (browserWakeEnabled) bwScheduleRestart();
+  };
+
+  try {
+    setWakeIndicator(mode === 'idle' ? 'idle' : 'listening');
+    bwRecognition.start();
+  } catch (e) {
+    bwScheduleRestart();
+  }
+}
+
+function bwScheduleRestart() {
+  clearTimeout(bwRestartTimer);
+  if (!browserWakeEnabled) { setWakeIndicator('off'); return; }
+  bwRestartTimer = setTimeout(() => {
+    if (!browserWakeEnabled) return;
+    if (bwShouldPause()) { bwScheduleRestart(); return; } // check again shortly
+    bwStartRecognition('idle');
+  }, 400);
+}
+
+function setBrowserWakeWordEnabled(enabled) {
+  browserWakeEnabled = !!enabled;
+  if (bwRecognition) { try { bwRecognition.stop(); } catch (e) {} }
+  clearTimeout(bwRestartTimer);
+  if (browserWakeEnabled) {
+    if (!SpeechRecognitionImpl) {
+      bwSetStatusLine('Hey Krishteen: not supported in this browser — try Chrome or Edge.');
+      setWakeIndicator('off');
+      return;
+    }
+    if (!window.isSecureContext) {
+      // The #1 reason this works for you but not for testers: a page
+      // opened over plain http:// (anything other than localhost) is
+      // blocked from using the microphone at all, silently, with no
+      // permission prompt and no exception thrown until recognition
+      // actually tries to start.
+      bwSetStatusLine('Hey Krishteen: disabled — this page needs to be opened over HTTPS (use the https:// ngrok link, not http://).');
+      setWakeIndicator('off');
+      return;
+    }
+    bwSetStatusLine('Hey Krishteen: starting…');
+    bwScheduleRestart();
+  } else {
+    bwSetStatusLine('');
+    setWakeIndicator('off');
+  }
+}
+
+// Auto-start on page load, matching the checkbox's default "checked" state
+// and the "no clicking needed" hint text — the browser's mic-permission
+// prompt appears right away rather than waiting for the user to open
+// Settings first.
+setBrowserWakeWordEnabled(document.getElementById('wakeWordToggle').checked);
+</script>
+</body>
+</html>

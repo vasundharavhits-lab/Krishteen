@@ -1,0 +1,159 @@
+body {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: #12131a;
+  color: #eee;
+  margin: 0;
+  padding: 20px;
+}
+
+.cal-wrap {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 16px;
+  position: relative;
+}
+
+.cal-header button {
+  background: #2a2c3a;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.cal-header button:hover {
+  background: #3a3d52;
+}
+
+.back-link {
+  position: absolute;
+  right: 0;
+  color: #9aa0ff;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+#monthLabel {
+  margin: 0;
+  min-width: 200px;
+  text-align: center;
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.cal-daylabel {
+  text-align: center;
+  font-weight: bold;
+  color: #888;
+  padding-bottom: 6px;
+  font-size: 13px;
+}
+
+.cal-day {
+  background: #1c1e29;
+  border-radius: 8px;
+  min-height: 64px;
+  padding: 6px;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.15s;
+}
+
+.cal-day:hover {
+  background: #2a2c3a;
+}
+
+.cal-day.empty {
+  background: transparent;
+  cursor: default;
+}
+
+.cal-day.today {
+  border: 1px solid #6c7bff;
+}
+
+.cal-day.selected {
+  background: #3a3d6b;
+}
+
+.cal-day-number {
+  font-size: 13px;
+  color: #ccc;
+}
+
+.cal-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 6px;
+}
+
+.cal-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.cal-dot.appointment { background: #6c7bff; }
+.cal-dot.reminder    { background: #35c98f; }
+.cal-dot.alarm       { background: #ff9d5c; }
+.cal-dot.fired       { opacity: 0.35; }
+
+.cal-panel {
+  margin-top: 20px;
+  background: #1c1e29;
+  border-radius: 10px;
+  padding: 16px;
+  min-height: 80px;
+}
+
+#dayPanelTitle {
+  margin: 0 0 10px 0;
+  font-size: 15px;
+  color: #ccc;
+}
+
+#dayPanelList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+#dayPanelList li {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #24263a;
+  margin-bottom: 6px;
+  font-size: 14px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+#dayPanelList li.fired {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+.cal-kind-tag {
+  font-size: 11px;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #333654;
+  color: #aab;
+  white-space: nowrap;
+}
