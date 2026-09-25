@@ -99,6 +99,22 @@ def _speak(text):
         print("[wakeword] TTS error:", e)
 
 
+def _open_microphone():
+    """Tries the default input device first, then falls back to explicit
+    device indices — same fallback list command.py's takeCommand() already
+    uses successfully. Returns a working sr.Microphone(), or None if no
+    device could be opened at all on this machine."""
+    for idx in [None, 0, 1]:
+        try:
+            mic = sr.Microphone() if idx is None else sr.Microphone(device_index=idx)
+            with mic as source:
+                pass  # just confirm it actually opens before returning it
+            return mic
+        except Exception as e:
+            print(f"[wakeword] Mic index {idx} unavailable: {e}")
+    return None
+
+
 def _calibrate(recognizer, mic):
     """One-time ambient noise calibration so the energy threshold actually
     matches this microphone/room instead of sitting at a generic default."""
@@ -116,12 +132,23 @@ def _calibrate(recognizer, mic):
         release_mic()
 
 
-def _listen(recognizer, mic, timeout, phrase_time_limit):
+def _listen(recognizer, device_index, timeout, phrase_time_limit):
     """One listen+recognize cycle, guarded by mic_guard. Returns '' on
-    silence/timeout/unclear audio/mic-busy."""
+    silence/timeout/unclear audio/mic-busy.
+
+    IMPORTANT: opens a brand-new sr.Microphone() every single call instead
+    of reusing one shared instance for the whole thread's lifetime. On
+    Windows, reusing the same Microphone object across many repeated
+    `with` blocks is a known source of the underlying PyAudio stream
+    ending up half torn-down after a cycle or two, at which point the
+    NEXT __exit__ tries to close a stream that's already None — exactly
+    the "'NoneType' object has no attribute 'close'" error this was
+    producing in an infinite tight loop. A fresh Microphone per call
+    avoids that shared, slowly-corrupting state entirely."""
     if not try_acquire_mic(timeout=0):
         return ""
     try:
+        mic = sr.Microphone() if device_index is None else sr.Microphone(device_index=device_index)
         with mic as source:
             audio = recognizer.listen(source, timeout=timeout, phrase_time_limit=phrase_time_limit)
         text = recognizer.recognize_google(audio, language='en').strip()
@@ -134,6 +161,10 @@ def _listen(recognizer, mic, timeout, phrase_time_limit):
         return ""
     except Exception as e:
         print("[wakeword] listen error:", e)
+        # Backoff so a persistent failure (e.g. no usable input device on
+        # this machine) produces one line every couple seconds instead of
+        # hundreds of identical lines in a tight retry loop.
+        time.sleep(2)
         return ""
     finally:
         release_mic()
@@ -185,7 +216,12 @@ def _watch_loop():
     recognizer = sr.Recognizer()
     recognizer.pause_threshold = 1.0  # was 0.8 - too short, was cutting off "hey krishteen" after just "hey"
     recognizer.dynamic_energy_threshold = True
-    mic = sr.Microphone()
+
+    mic = _open_microphone()
+    if mic is None:
+        print("[wakeword] No usable microphone found on this device — wake-word listener will not start.")
+        return
+    device_index = mic.device_index  # None = default device, or the fallback index that worked
 
     _calibrate(recognizer, mic)
     print('[wakeword] "Hey een" listener is active.')
@@ -199,7 +235,7 @@ def _watch_loop():
             time.sleep(0.5)
             continue
         _set_ui_state("listening")
-        heard = _listen(recognizer, mic, timeout=4, phrase_time_limit=4)
+        heard = _listen(recognizer, device_index, timeout=4, phrase_time_limit=4)
         
 
         if not heard:
@@ -223,7 +259,7 @@ def _watch_loop():
             _ack_index += 1
             _speak(ack)
             _set_ui_state("listening")
-            query = _listen(recognizer, mic, timeout=6, phrase_time_limit=10)
+            query = _listen(recognizer, device_index, timeout=6, phrase_time_limit=10)
 
         if not query:
             _set_ui_state("idle")
