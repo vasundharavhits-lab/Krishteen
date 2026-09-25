@@ -2,15 +2,32 @@ import json
 import os
 import re
 import threading
+from collections import Counter
 from datetime import datetime, timezone
 
 import requests
 from engine.preferences import get_style_instruction, get_role_instruction, get_style, get_role
 
 OLLAMA_URL = "http://localhost:11434/api/chat"
-MODEL_NAME = "krishteen-v13"
+MODEL_NAME = "krishteen-v15"
 
 _MAX_TURNS = 5
+
+# CANONICAL identity/rules sentence — this exact wording is also what the
+# training dataset's default-persona examples use (krishteen_finetune_dataset_v15.jsonl)
+# and what the v15 Modelfile bakes in as SYSTEM. Previously this file had its
+# own hand-written version of these rules that didn't match any of the ~30
+# different wordings the model was actually trained on, which meant the
+# model was never trained on the prompt it was actually served with at
+# inference time. If this sentence ever needs to change, change it in the
+# training data and Modelfile too — don't let it drift again.
+CANON_BASE_PROMPT = (
+    "You are Krishteen, an AI assistant created by Virtual Height in Indore. "
+    "Answer the question directly and specifically — never just acknowledge it. "
+    "You have no friends, feelings, or private life — say so plainly if asked, don't invent one. "
+    "You have no live internet, weather, or news access — say so plainly if asked for that, "
+    "but answer normal factual questions (people, places, history, science) as usual."
+)
 
 
 # --- Conversation logging (for future fine-tuning) ------------------------
@@ -104,6 +121,45 @@ def clear_session(session_id):
     _chat_histories.pop(session_id, None)
 
 
+# --- Broken-output detector -------------------------------------------------
+#
+# krishteen-v14 occasionally falls into a reproducible degenerate ramble on
+# short, low-content inputs ("hey", "hi") — confirmed reproducible even at
+# temperature 0, so it's not random bad luck, it's a real generation failure
+# for that input. This catches the two shapes that failure has actually
+# taken in testing: (1) a huge wall of text in response to a tiny input, and
+# (2) one word/token dominating the answer (repetition loop). It does NOT
+# try to judge whether an answer is *correct* — only whether it's clearly
+# broken as text.
+def _looks_broken(answer, query):
+    words = answer.split()
+    n = len(words)
+    if n == 0:
+        return True
+
+    # A one-to-three word input (hey, hi, what's up) getting a 60+ word
+    # reply is already a strong sign of a rambling loop, regardless of
+    # content.
+    if len(query.split()) <= 3 and n > 60:
+        return True
+
+    # One word/token making up a big share of a longish answer is the
+    # repetition-loop signature we've seen ("...tasks,tasks,tasks...",
+    # "...— no, — no, — no...").
+    if n >= 20:
+        counts = Counter(w.lower().strip(",.:;—-\"'") for w in words)
+        _, top_count = counts.most_common(1)[0]
+        if top_count / n > 0.12:
+            return True
+
+    # Excessive em-dash usage has been the other consistent marker of the
+    # broken pattern in testing.
+    if answer.count("—") >= 8:
+        return True
+
+    return False
+
+
 def askAI(query, session_id="chat"):
     """
     session_id scopes the conversation memory. Two different session_ids
@@ -123,6 +179,37 @@ def askAI(query, session_id="chat"):
     finally:
         with _in_flight_lock:
             _sessions_in_flight.discard(session_id)
+
+
+def _call_ollama(messages, options):
+    """One real request to Ollama. Returns (answer_text, error_message).
+    error_message is None on success."""
+    try:
+        response = requests.post(
+            OLLAMA_URL,
+            json={
+                "model": MODEL_NAME,
+                "messages": messages,
+                "stream": False,
+                "options": options,
+            },
+            timeout=120,
+        )
+    except requests.exceptions.ConnectionError:
+        return None, "Ollama is not running. Please start Ollama."
+    except requests.exceptions.Timeout:
+        return None, "The AI is taking too long to respond."
+    except Exception as e:
+        return None, f"Error: {str(e)}"
+
+    if response.status_code != 200:
+        print("Status Code:", response.status_code)
+        print("Response:", response.text)
+        return None, "Sorry, I couldn't process your request."
+
+    data = response.json()
+    answer = data.get("message", {}).get("content", "").strip()
+    return answer, None
 
 
 def _ask_ai_inner(query, session_id):
@@ -146,105 +233,64 @@ def _ask_ai_inner(query, session_id):
         or re.match(r'^\s*(hi+|hey+|hello+|heya|namaste|yo)\s*[!.,]*\s*$', lowered_query)
     )
 
-    
-
-    system_prompt = f"""
-You are Krishteen, a helpful AI assistant created by Virtual Height in Indore.
-Answer the user's question naturally, accurately, and clearly.
-Use your own words instead of fixed or copied replies.
-If you are uncertain, say so honestly.
-Do not invent personal experiences, feelings, or a private life.
-{get_style_instruction()}
-""".strip()
-     
+    system_prompt = f"{CANON_BASE_PROMPT} {get_style_instruction()}"
 
     # IMPORTANT: no more manually-typed "User: ... Assistant:" text labels.
     # Your model was fine-tuned with tokenizer.apply_chat_template() on a
     # real messages=[{"role": ..., "content": ...}] array — a structured
     # format with the chat template's own special tokens, not plain text
-    # role labels. Building "User: hey\nAssistant:" as a raw string and
-    # sending it as "prompt" fed the model a format it never actually
-    # trained on, which is why increasingly odd/novel questions kept
-    # leaking unpredictable text (including literally echoing the word
-    # "User:" back). Sending a proper messages array through /api/chat
+    # role labels. Sending a proper messages array through /api/chat
     # matches training exactly instead of approximating it.
-    #
-    # This turn's user message is included in what's SENT to the model
-    # below, but not yet appended to the persisted `history` list — that
-    # only happens after the reply comes back and we know whether to
-    # keep this exchange (see _is_meta_turn above).
     messages = [{"role": "system", "content": system_prompt}] + history + [
         {"role": "user", "content": query}
     ]
 
-    try:
-        response = requests.post(
-            OLLAMA_URL,
-            json={
-                "model": MODEL_NAME,
-                "messages": messages,
-                "stream": False,
-                # Fixes a separate bug from the earlier leak: on open-ended
-                # questions (opinions, hallucination-refusal, fictional
-                # entities) the model can get stuck repeating a short
-                # filler phrase ("say clearly") over and over instead of
-                # finishing a real answer — a classic small-model
-                # degenerate-repetition loop. repeat_penalty actively
-                # discourages reusing recent tokens; repeat_last_n sets
-                # how far back it looks when checking for repeats.
-                "options": {
-                    # Was 1.4 — strong enough to also fight normal reuse of
-                    # digits/formatting tokens on any answer, not just
-                    # filler loops. 1.2 still breaks up repetition loops
-                    # but leaves more headroom for legitimately repeated
-                    # tokens (needed for multi-step arithmetic).
-                    "repeat_penalty": 1.2,
-                    "repeat_last_n": 64,
-                    # Lower temperature/top_p = less "creative" sampling,
-                    # which is exactly what arithmetic needs: the model
-                    # should pick the most likely next digit, not an
-                    # interesting one. Ollama's default temperature (0.8)
-                    # is tuned for conversational variety, not correctness.
-                    "temperature": 0.3,
-                    "top_p": 0.9,
-                    # Caps how far a single answer can run. The garbled
-                    # tails in the screenshot happened well into long
-                    # answers — cutting the ceiling means a wrong turn
-                    # ends the reply instead of spiraling further.
-                    "num_predict": 220
-                }
-            },
-            timeout=120
-        )
+    base_options = {
+        "repeat_penalty": 1.2,
+        "repeat_last_n": 64,
+        "temperature": 0.3,
+        "top_p": 0.9,
+        "num_predict": 220,
+    }
 
-        if response.status_code != 200:
-            print("Status Code:", response.status_code)
-            print("Response:", response.text)
-            return "Sorry, I couldn't process your request."
+    answer, error = _call_ollama(messages, base_options)
+    if error:
+        return error
 
-        data = response.json()
+    if not answer:
+        answer = "Sorry, I couldn't generate a response."
 
-        answer = data.get("message", {}).get("content", "").strip()
+    # Safety net: the model generates a REAL answer every time — this only
+    # fires when that first real answer is clearly broken as text (wall of
+    # repeated words/tokens on a tiny input). When that happens, ask the
+    # model again once, with randomness turned off, using just this turn
+    # (no history) to keep the retry as simple/clean as possible for it.
+    if _looks_broken(answer, query):
+        print("[ai] First answer looked broken, retrying once at temperature 0...")
+        retry_messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": query},
+        ]
+        retry_options = dict(base_options)
+        retry_options["temperature"] = 0.0
+        retry_answer, retry_error = _call_ollama(retry_messages, retry_options)
 
-        if not answer:
-            answer = "Sorry, I couldn't generate a response."
+        if retry_answer and not retry_error and not _looks_broken(retry_answer, query):
+            answer = retry_answer
+        else:
+            # Both real attempts came back broken — say so honestly instead
+            # of returning garbled text OR faking a clean answer that wasn't
+            # actually generated.
+            print("[ai] Retry also looked broken. Returning an honest fallback.")
+            answer = "Sorry, that one didn't come out right on my end — could you try asking again, maybe with a full question?"
 
-        if not _is_meta_turn:
-            history.append({"role": "user", "content": query})
-            history.append({"role": "assistant", "content": answer})
-            max_messages = _MAX_TURNS * 2
-            if len(history) > max_messages:
-                del history[:len(history) - max_messages]
+    if not _is_meta_turn:
+        history.append({"role": "user", "content": query})
+        history.append({"role": "assistant", "content": answer})
+        max_messages = _MAX_TURNS * 2
+        if len(history) > max_messages:
+            del history[:len(history) - max_messages]
 
-        _log_exchange(session_id, system_prompt, query, answer, handled_by="model")
+    _log_exchange(session_id, system_prompt, query, answer, handled_by="model")
 
-        return answer
-
-    except requests.exceptions.ConnectionError:
-        return "Ollama is not running. Please start Ollama."
-
-    except requests.exceptions.Timeout:
-        return "The AI is taking too long to respond."
-
-    except Exception as e:
-        return f"Error: {str(e)}"
+    return answer
